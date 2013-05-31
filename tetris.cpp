@@ -3,8 +3,15 @@
 #include <vector>
 #include <iostream>
 #include <cstdlib>
+#include <string>
 
 using namespace std;
+
+// czas pomiędzy kolejnymi klatkami (40ms -> 25 fps)
+int animationSpeed = 40;
+
+// czy gra trwa nadal
+bool gameOver = false;
 
 // rozmiary bryły obcinania
 const GLdouble board_width = 200.0;
@@ -196,6 +203,15 @@ void DrawFrame(float width, float height)
     glEnd();
 }
 
+void DrawText(string text){
+    glPushMatrix();
+    glTranslatef(50, board_height / 2, 0);
+    glScalef(0.2, 0.2, 0.2);
+    for(int i = 0; i < text.length(); i++)
+        glutStrokeCharacter(GLUT_STROKE_ROMAN, text[i]);
+    glPopMatrix();
+}
+
 void Display()
 {
     // kolor tła - zawartość bufora koloru
@@ -212,16 +228,22 @@ void Display()
     // kolor krawędzi ramki
     glColor3f( 0.0, 0.0, 0.0 );
 
-    
-    // rysowanie ramki
-    DrawFrame(board_width, board_height);
+    if(gameOver)
+        DrawText("Game Over");
+    else {
+        // rysowanie ramki
+        DrawFrame(board_width, board_height);
 
-    // jeśli ostatnio przesuwany klocek spadł na inny klocek (lub jest na samym dole) to wrzucamy nowy klocek do bufora
-    if(blocks.freeSpaceBelowLastBlock() == 0)
-        blocks.push_back(Block(Painter::Color(rand() % Painter::LAST)));
+        // jeśli ostatnio przesuwany klocek spadł na inny klocek (lub jest na samym dole) to wrzucamy nowy klocek do bufora
+        if(blocks.freeSpaceBelowLastBlock() <= 0){
+            blocks.push_back(Block(Painter::Color(rand() % Painter::LAST)));
+            if(blocks.freeSpaceBelowLastBlock() <= 0)
+                gameOver = true;
+        }
 
-    // rysujemy wszystkie klocki i przesuwamy każdy jeśli zmieniła się jego pozycja
-    blocks.translateAndDraw();
+        // rysujemy wszystkie klocki i przesuwamy każdy jeśli zmieniła się jego pozycja
+        blocks.translateAndDraw();
+    }
 
     // skierowanie poleceń do wykonania
     glFlush();
@@ -323,7 +345,9 @@ void Animate(int arg)
     }
 
     glutPostRedisplay();
-    glutTimerFunc(45, Animate, 0);
+
+    if(!gameOver)
+        glutTimerFunc(animationSpeed, Animate, 0);
 }
 
 int main( int argc, char * argv[] )
@@ -356,7 +380,7 @@ int main( int argc, char * argv[] )
     glutSpecialFunc( SpecialKeys );
 
     // odpalenie animacji (po 45ms)
-    glutTimerFunc(45, Animate, 0);
+    glutTimerFunc(animationSpeed, Animate, 0);
     
     // wprowadzenie programu do obsługi pętli komunikatów
     glutMainLoop();
