@@ -1,13 +1,8 @@
-/*
-(c) Janusz Ganczarski
-http://www.januszg.hg.pl
-JanuszG(małpeczka)enter.net.pl
-*/
-
 #include <GL/glut.h>
 #include <stdlib.h>
 #include <vector>
 #include <iostream>
+#include <cstdlib>
 
 using namespace std;
 
@@ -15,13 +10,51 @@ using namespace std;
 const GLdouble board_width = 200.0;
 const GLdouble board_height = 200.0;
 
-const GLdouble board_left = -10.0;
-const GLdouble board_right = board_width + 50;
-const GLdouble bottom = -10.0;
-const GLdouble top = board_height - bottom;
+const GLdouble window_left = -10.0;
+const GLdouble window_right = board_width + 50;
+const GLdouble window_bottom = -10.0;
+const GLdouble window_top = board_height - window_bottom;
 const GLdouble near = -1.0;
 const GLdouble far = 1.0;
 
+class Painter {
+public:
+    enum Color {RED = 0, GREEN = 1, BLUE = 2, YELLOW = 3, ORANGE  = 4,
+                VIOLET = 5, PINK = 6, BROWN = 7, GREY = 8, LAST = 9
+    };
+
+    static void paint(Color color){
+        switch(color) {
+            case RED:
+                glColor3f( 1.0, 0.0, 0.0 );
+                break;
+            case GREEN:
+                glColor3f( 0.0, 1.0, 0.0 );
+                break;
+            case BLUE:
+                glColor3f( 0.0, 0.0, 1.0 );
+                break;
+            case YELLOW:
+                glColor3f( 1.0, 1.0, 0.0 );
+                break;
+            case ORANGE:
+                glColor3f( 1.0, 0.5, 0.0 );
+                break;
+            case VIOLET:
+                glColor3f( 0.5, 0.0, 1.0 );
+                break;
+            case PINK:
+                glColor3f( 1.0, 0.0, 1.0 );
+                break;
+            case BROWN:
+                glColor3f( 0.5, 0.25, 0.0 );
+                break;
+            default:    // grey
+                glColor3f( 0.5, 0.5, 0.5 );
+                break;
+        }
+    }
+};
 
 class Block
 {
@@ -30,15 +63,18 @@ public:
     GLfloat height;
     GLfloat pos_x; 
     GLfloat pos_y;
+    Painter::Color color;
 
-    Block(GLfloat width=20.f, GLfloat height=20.f){
+    Block(Painter::Color color=Painter::GREY, GLfloat width=20.f, GLfloat height=20.f){
         this->width = width;
         this->height = height;
         this->pos_x = board_width / 2 - width;
         this->pos_y = board_height - height;
+        this->color = color;
     }
 
     void draw(){
+        Painter::paint(color);
         glBegin(GL_POLYGON);
             glVertex2f(0.f, 0.f);
             glVertex2f(0.f, height);
@@ -48,15 +84,96 @@ public:
     }
 
     bool isOnTheBottom(){
-        return pos_y == 0;
+        return pos_y <= 0;
+    }
+
+    bool isOnTheLeft(){
+        return pos_x <= 0;
+    }
+
+    bool isOnTheRight(){
+        return pos_y >= board_width;
+    }
+
+    bool canCollideVertically(Block otherBlock){
+        return  // czy przesuwając klocek w górę lub w dół możemy trafić na inny klocek
+                (pos_x + width > otherBlock.pos_x &&
+                pos_x  < otherBlock.pos_x + otherBlock.width);
+    }
+
+    bool canCollideHorizontally(Block otherBlock){
+        return  // czy przesuwając klocek w lewo lub w prawo możemy trafić na inny klocek
+                (pos_y + height > otherBlock.pos_y &&
+                pos_y  < otherBlock.pos_y + otherBlock.height);
+    }
+
+};
+
+class BlocksBuffer : public vector<Block>
+{
+public:
+    GLfloat freeSpaceBelowLastBlock(){
+        if(back().isOnTheBottom())
+            return 0;
+
+        GLfloat distance = back().pos_y;
+        for(int i = 0; i < size() - 1; i++)
+            if(back().canCollideVertically(this->at(i))){
+                GLfloat tmpDist = back().pos_y - this->at(i).pos_y - this->at(i).height;
+                if(tmpDist < distance)
+                    distance = tmpDist;
+            }
+
+        return distance;
+    }
+    GLfloat freeSpaceOnTheLeftOfLastBlock(){
+        if(back().isOnTheLeft())
+            return 0;
+
+        GLfloat distance = back().pos_x;
+        for(int i = 0; i < size() - 1; i++)
+            // jeśli ostatni klocek jest po prawej stronie od i-tego i nie koliduje z i-tym
+            if(back().pos_x > this->at(i).pos_x && back().canCollideHorizontally(this->at(i))){
+                GLfloat tmpDist = back().pos_x - this->at(i).pos_x - this->at(i).width;
+                if(tmpDist < distance)
+                    distance = tmpDist;
+            }
+
+        return distance;
+    }
+    GLfloat freeSpaceOnTheRightOfLastBlock(){
+        if(back().isOnTheRight())
+            return 0;
+
+        GLfloat distance = board_width - back().width - back().pos_x;
+        for(int i = 0; i < size() - 1; i++)
+            // jeśli ostatni klocek jest po lewej stronie od i-tego i nie koliduje z i-tym
+            if(back().pos_x < this->at(i).pos_x && back().canCollideHorizontally(this->at(i))){
+                GLfloat tmpDist = this->at(i).pos_x - back().pos_x - back().width;
+                if(tmpDist < distance)
+                    distance = tmpDist;
+            }
+
+        return distance;
+    }
+
+    void translateAndDraw(){
+        for(int i = 0; i < size(); i++){
+            glPushMatrix();
+            glTranslatef( this->at(i).pos_x, this->at(i).pos_y, 0.0 );
+            this->at(i).draw();
+            glPopMatrix();
+        }
     }
 };
 
-vector<Block> blocks;
-Block block;
+BlocksBuffer blocks;
 
 void DrawFrame(float width, float height)
 {
+    // kolor krawędzi ramki
+    glColor3f( 0.0, 0.0, 0.0 );
+
     //linia
     glLineWidth ( 2 ); //grubość linii
 
@@ -92,24 +209,19 @@ void Display()
     
     // macierz modelowania = macierz jednostkowa
     glLoadIdentity();
-    
-    // kolor krawędzi obiektu
+    // kolor krawędzi ramki
     glColor3f( 0.0, 0.0, 0.0 );
+
     
     // rysowanie ramki
     DrawFrame(board_width, board_height);
 
-    // jeśli ostatnio przesuwany klocek jest na dole to wrzucamy nowy klocek do bufora
-    if(blocks.back().isOnTheBottom())
-        blocks.push_back(Block());
+    // jeśli ostatnio przesuwany klocek spadł na inny klocek (lub jest na samym dole) to wrzucamy nowy klocek do bufora
+    if(blocks.freeSpaceBelowLastBlock() == 0)
+        blocks.push_back(Block(Painter::Color(rand() % Painter::LAST)));
 
-    // rysujemy wszystkie klocki
-    for(int i = 0; i < blocks.size(); i++){
-        glPushMatrix();
-        glTranslatef( blocks[i].pos_x, blocks[i].pos_y, 0.0 );
-        blocks[i].draw();
-        glPopMatrix();
-    }
+    // rysujemy wszystkie klocki i przesuwamy każdy jeśli zmieniła się jego pozycja
+    blocks.translateAndDraw();
 
     // skierowanie poleceń do wykonania
     glFlush();
@@ -133,12 +245,12 @@ void Reshape( int width, int height )
     
     // wysokość okna większa od wysokości okna
     if( width < height && width > 0 )
-        glOrtho( board_left, board_right, bottom * height / width, top * height / width, near, far );
+        glOrtho( window_left, window_right, window_bottom * height / width, window_top * height / width, near, far );
     else
 
     // szerokość okna większa lub równa wysokości okna
     if( width >= height && height > 0 )
-        glOrtho( board_left * width / height, board_right * width / height, bottom, top, near, far );
+        glOrtho( window_left * width / height, window_right * width / height, window_bottom, window_top, near, far );
     
     // generowanie sceny 3D
     Display();
@@ -159,39 +271,42 @@ void SpecialKeys( int key, int x, int y )
     // bierzemy ostatni klocek z bufora
     Block* block = &(blocks.back());
 
-    // jeśli klocek jest na dole to nie przesuwaj
-    if(block->isOnTheBottom())
-        return;
-
+    GLfloat freeSpace;
     switch( key )
     {
-        // kursor w lewo
-    case GLUT_KEY_LEFT:
-        if(block->pos_x > block->width)
-            block->pos_x -= block->width;
-        else if(block->pos_x > 0)
-            block->pos_x = 0;
-        break;
-        
-        // kursor w górę
-    case GLUT_KEY_UP:
-        break;
-        
-        // kursor w prawo
-    case GLUT_KEY_RIGHT:
-        if(block->pos_x < board_width - block->width - block->width)
-            block->pos_x += block->width;
-        else if(block->pos_x < board_width - block->width)
-            block->pos_x = board_width - block->width;
-        break;
-        
-        // kursor w dół
-    case GLUT_KEY_DOWN:
-        if(block->pos_y > 10)
-            block->pos_y -= 10;
-        else if(block->pos_y > 0)
-            block->pos_y = 0;
-        break;
+            // strzałka w lewo
+        case GLUT_KEY_LEFT:
+            freeSpace = blocks.freeSpaceOnTheLeftOfLastBlock();
+            cout << "freeSpaceOnTheLeftOfLastBlock " << freeSpace << endl;
+            if(freeSpace > block->width)
+                block->pos_x -= block->width;
+            else
+                block->pos_x -= freeSpace;
+            break;
+            
+            // strzałka w górę
+        case GLUT_KEY_UP:
+            break;
+            
+            // strzałka w prawo
+        case GLUT_KEY_RIGHT:
+            freeSpace = blocks.freeSpaceOnTheRightOfLastBlock();
+            cout << "freeSpaceOnTheRightOfLastBlock " << freeSpace << endl;
+            if(freeSpace > block->width)
+                block->pos_x += block->width;
+            else
+                block->pos_x += freeSpace;
+            break;
+            
+            // strzałka w dół
+        case GLUT_KEY_DOWN:
+            freeSpace = blocks.freeSpaceBelowLastBlock();
+            cout << "freeSpaceBelowLastBlock " << freeSpace << endl;
+            if(freeSpace > block->height)
+                block->pos_y -= block->height;
+            else
+                block->pos_y -= freeSpace;
+            break;
     }
     
     // odrysowanie okna
