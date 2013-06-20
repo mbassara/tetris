@@ -18,9 +18,9 @@ const GLdouble board_width = 200.0;
 const GLdouble board_height = 200.0;
 
 const GLdouble window_left = -10.0;
-const GLdouble window_right = board_width + 50;
+const GLdouble window_right = board_width + 10;
 const GLdouble window_bottom = -10.0;
-const GLdouble window_top = board_height - window_bottom;
+const GLdouble window_top = board_height + 10;
 const GLdouble near = -1.0;
 const GLdouble far = 1.0;
 
@@ -282,8 +282,9 @@ void Reshape( int width, int height )
 
 void Keyboard( unsigned char key, int x, int y )
 {
-    // odrysowanie okna
-    Reshape( glutGet( GLUT_WINDOW_WIDTH ), glutGet( GLUT_WINDOW_HEIGHT ) );
+    // 27 - klawisz ESC
+    if(key == 27)
+        exit(0);
 }
 
 // obsługa klawiszy funkcyjnych i klawiszy kursora
@@ -299,7 +300,6 @@ void SpecialKeys( int key, int x, int y )
             // strzałka w lewo
         case GLUT_KEY_LEFT:
             freeSpace = blocks.freeSpaceOnTheLeftOfLastBlock();
-            cout << "freeSpaceOnTheLeftOfLastBlock " << freeSpace << endl;
             if(freeSpace > block->width)
                 block->pos_x -= block->width;
             else
@@ -313,7 +313,6 @@ void SpecialKeys( int key, int x, int y )
             // strzałka w prawo
         case GLUT_KEY_RIGHT:
             freeSpace = blocks.freeSpaceOnTheRightOfLastBlock();
-            cout << "freeSpaceOnTheRightOfLastBlock " << freeSpace << endl;
             if(freeSpace > block->width)
                 block->pos_x += block->width;
             else
@@ -323,7 +322,6 @@ void SpecialKeys( int key, int x, int y )
             // strzałka w dół
         case GLUT_KEY_DOWN:
             freeSpace = blocks.freeSpaceBelowLastBlock();
-            cout << "freeSpaceBelowLastBlock " << freeSpace << endl;
             if(freeSpace > block->height)
                 block->pos_y -= block->height;
             else
@@ -340,7 +338,7 @@ void Animate(int arg)
     // bierzemy ostatni klocek z bufora
     Block* block = &(blocks.back());
 
-    if(block->pos_y > 0){
+    if(!block->isOnTheBottom()){
         block->pos_y -= 1;
     }
 
